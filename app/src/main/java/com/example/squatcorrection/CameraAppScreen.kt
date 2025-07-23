@@ -1,8 +1,10 @@
 package com.example.squatcorrection
 
+import android.util.Log
 import androidx.camera.core.CameraSelector
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
@@ -23,7 +25,10 @@ fun CameraAppScreen() {
     Box(modifier = Modifier.fillMaxSize()) {
         CameraPreview(
             lensFacing = lensFacing,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
+            onImageAnalysis = { imageProxy ->
+                Log.d("CameraAnalysis", "Frame: ${imageProxy.width}x${imageProxy.height}")
+                imageProxy.close()}
         )
 
         Column(
