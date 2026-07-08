@@ -1,12 +1,11 @@
 package com.example.squatcorrection
 
 import android.util.Log
-import android.util.Size
+import androidx.camera.core.AspectRatio
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
-import androidx.camera.core.resolutionselector.ResolutionSelector
-import androidx.camera.core.resolutionselector.ResolutionStrategy
+import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.lifecycle.awaitInstance
 import androidx.camera.view.PreviewView
@@ -30,21 +29,21 @@ fun CameraPreview(
 ) {
     val localContext = LocalContext.current
     val localLifecycleOwner = LocalLifecycleOwner.current
-    val previewUseCase = remember { androidx.camera.core.Preview.Builder().build() }
     var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+
+    val backgroundExecutor = remember { Executors.newSingleThreadExecutor() }
+
+    val previewUseCase = remember {
+        Preview.Builder()
+            .setTargetAspectRatio(AspectRatio.RATIO_16_9)
+            .build()
+    }
 
     val imageAnalysisUseCase = remember {
         ImageAnalysis.Builder()
-            .setResolutionSelector(
-                ResolutionSelector.Builder()
-                    .setResolutionStrategy(
-                        ResolutionStrategy(Size(720,1280),
-                            ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER
-                        )
-                    )
-                    .build()
-            )
+            .setTargetAspectRatio(AspectRatio.RATIO_16_9)
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+            .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
             .build()
     }
 
@@ -56,40 +55,38 @@ fun CameraPreview(
 
             provider.unbindAll()
 
-            Log.d("CameraPreview", "Rebinding camera with lensFacing: $lensFacing")
+            Log.d("CameraPreview", "Binding camera with MediaPipe analysis...")
 
             onImageAnalysis?.let { analyzer ->
-                Log.d("CameraPreview", "Setting up image analyzer")
-                imageAnalysisUseCase.setAnalyzer(
-                    Executors.newSingleThreadExecutor()
-                ) { imageProxy ->
+                imageAnalysisUseCase.setAnalyzer(backgroundExecutor) { imageProxy ->
                     analyzer(imageProxy)
-                    imageProxy.close()
                 }
             }
 
-            val useCases = if (onImageAnalysis != null) {
-                arrayOf(previewUseCase, imageAnalysisUseCase)
-            } else {
-                arrayOf(previewUseCase)
+            try {
+
+                val camera = provider.bindToLifecycle(
+                    localLifecycleOwner,
+                    cameraSelector,
+                    previewUseCase,
+                    imageAnalysisUseCase
+                )
+
+                Log.d("CameraPreview", "Camera bound successfully for MediaPipe")
+            } catch (exc: Exception) {
+                Log.e("CameraPreview", "Camera binding failed", exc)
             }
-
-            Log.d("CameraPreview", "Binding ${useCases.size} use cases")
-
-            provider.bindToLifecycle(
-                localLifecycleOwner,
-                cameraSelector,
-                *useCases
-            )
         }
     }
 
     LaunchedEffect(Unit) {
+        Log.d("CameraPreview", "Getting camera provider...")
         cameraProvider = ProcessCameraProvider.awaitInstance(localContext)
         rebindCameraProvider()
     }
 
     LaunchedEffect(lensFacing) {
+        Log.d("CameraPreview", "Rebinding for lens: $lensFacing")
         rebindCameraProvider()
     }
 
@@ -97,7 +94,10 @@ fun CameraPreview(
         modifier = modifier,
         factory = { context ->
             PreviewView(context).also { previewView ->
+                previewView.scaleType = PreviewView.ScaleType.FILL_START
+
                 previewUseCase.surfaceProvider = previewView.surfaceProvider
+                Log.d("CameraPreview", "Surface provider attached with FILL_START mode")
             }
         }
     )

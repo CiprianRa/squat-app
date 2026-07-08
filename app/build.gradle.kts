@@ -49,10 +49,13 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation("androidx.navigation:navigation-compose:2.7.5")
 
     //versions toml
+    implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.16.1")
     implementation(libs.bundles.camera)
     implementation(libs.bundles.ml)
+    implementation(libs.bundles.litert)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
